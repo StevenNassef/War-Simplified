@@ -1,4 +1,4 @@
-namespace Game.Model
+namespace Game.Core.Model
 {
     public readonly struct Card
     {
