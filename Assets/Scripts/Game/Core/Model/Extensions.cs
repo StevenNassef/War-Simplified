@@ -42,6 +42,10 @@ namespace Game.Core.Model
                 highestIndex = -1;
                 highestItem = default;
             }
+            else
+            {
+                highestItem = items[highestIndex];
+            }
             
             return highestIndex;
         }
@@ -82,6 +86,10 @@ namespace Game.Core.Model
             {
                 highestIndex = -1;
                 highestItem = default;
+            }
+            else
+            {
+                highestItem = items[highestIndex];
             }
             
             return highestIndex;
