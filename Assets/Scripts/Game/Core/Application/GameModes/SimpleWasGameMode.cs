@@ -20,7 +20,7 @@ namespace Game.Core.Application.GameModes
         {
             gameState.MaxRounds = _initialMaxRounds;
             gameState.CurrentRound = 0;
-            gameState.Phase = GamePhase.NotStarted;
+            gameState.Phase = GamePhase.Playing;
 
             // Initialize player states
             gameState.Players = new PlayerState[players.Count];

@@ -4,7 +4,8 @@
     "references": [
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
-        "Game.Core"
+        "Game.Core",
+        "TNRD.NSubstitute"
     ],
     "includePlatforms": [
         "Editor"

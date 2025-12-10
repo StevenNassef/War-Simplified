@@ -40,7 +40,7 @@ namespace Game.Core.Tests.Application.GameModes
             // Assert
             Assert.AreEqual(8, _gameState.MaxRounds);
             Assert.AreEqual(0, _gameState.CurrentRound);
-            Assert.AreEqual(GamePhase.NotStarted, _gameState.Phase);
+            Assert.AreEqual(GamePhase.Playing, _gameState.Phase);
             Assert.IsNotNull(_gameState.Players);
             Assert.AreEqual(2, _gameState.Players.Length);
             Assert.AreEqual(0, _gameState.Players[0].Score);
