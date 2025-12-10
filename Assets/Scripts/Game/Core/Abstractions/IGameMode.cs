@@ -8,7 +8,7 @@ namespace Game.Core.Abstractions
         int PointsPerRound { get; }
         
         void ConfigureNewGame(GameState gameState, IReadOnlyList<IPlayer> players);
-        int ResolveRoundWinner(GameState gameState, IReadOnlyList<IPlayer> players, IReadOnlyList<Card> roundCards);
+        int EvaluateRoundOutcome(GameState gameState, IReadOnlyList<IPlayer> players, IReadOnlyList<Card> roundCards);
         bool TryResolveGameWinner(GameState gameState, IReadOnlyList<IPlayer> players, out int winnerIndex);
     }
 }
