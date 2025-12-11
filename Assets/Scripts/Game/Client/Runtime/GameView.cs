@@ -4,6 +4,8 @@ using Game.Core.Abstractions;
 using Game.Core.Model;
 using UnityEngine;
 using TMPro;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace Game.Client.Runtime
 {
@@ -26,13 +28,33 @@ namespace Game.Client.Runtime
 
         [SerializeField] [Tooltip("for displaying round winner")]
         private TextMeshProUGUI roundWinnerText;
+        
+        [Header("Main Menu Panel")] [SerializeField]
+        private GameObject mainMenuPanel;
 
+        [Header("Game Panel")] [SerializeField] [Tooltip("Parent GameObject for main panel")] 
+        private GameObject gamePanel;
+        
         [Header("Game Over Display")] [SerializeField] [Tooltip("Parent GameObject for game over display")]
         private GameObject gameOverPanel;
 
         [SerializeField] [Tooltip("for displaying game over message")]
         private TextMeshProUGUI gameOverText;
+
+        [SerializeField] private GameObject playerControls;
         
+        [SerializeField] private Button restartButton;
+
+        private void Awake()
+        {
+            restartButton.onClick.AddListener(RestartGameScene);
+        }
+
+        private void OnDisable()
+        {
+            if (!restartButton) return;
+            restartButton.onClick.RemoveAllListeners();
+        }
 
         public override void Initialize(IPlayer[] players)
         {
@@ -56,15 +78,20 @@ namespace Game.Client.Runtime
 
             for (var i = 0; i < playerScoreDisplays.Length && i < Players.Length; i++)
                 playerScoreDisplays[i].Initialize(Players[i]);
+            
+            // Initialize round text
+            roundNumberText.text = "Round 1";
+            roundWinnerText.text = string.Empty;
         }
 
         protected override async Task StartGameInternal()
         {
             await Task.Yield();
-
-            roundResultPanel.SetActive(false);
-
+            gamePanel.SetActive(true);
+            mainMenuPanel.SetActive(false);
+            roundResultPanel.SetActive(true);
             gameOverPanel.SetActive(false);
+            playerControls.gameObject.SetActive(true);
         }
 
         protected override async Task UpdateScoresInternal(IReadOnlyList<int> scores)
@@ -79,11 +106,9 @@ namespace Game.Client.Runtime
             IReadOnlyList<int> scores,
             int roundWinnerId)
         {
+            playerControls.gameObject.SetActive(false);
             await Task.Yield();
-
-            // Show round result panel
-            roundResultPanel.SetActive(true);
-
+            
             // Display round number
             roundNumberText.text = $"Round {roundIndex}";
 
@@ -107,18 +132,29 @@ namespace Game.Client.Runtime
             {
                 roundWinnerText.text = "Tie!";
             }
-
-            // Update scores
-            await UpdateScoresInternal(scores);
+            
+            await Task.Delay(2000);
+            
+            roundWinnerText.text = string.Empty;
+            
+            // Clear cards
+            for (var i = 0; i < cardTexts.Length && i < cards.Count; i++)
+            {
+                cardTexts[i].text = string.Empty;
+            }
+            
+            playerControls.gameObject.SetActive(true);
+            // Display round number
+            roundNumberText.text = $"Round {roundIndex + 1}";
         }
 
         protected override async Task ShowGameOverInternal(int winnerId)
         {
+            roundResultPanel.SetActive(false);
+            
             await Task.Yield();
 
             gameOverPanel.SetActive(true);
-
-            roundResultPanel.SetActive(false);
 
             switch (winnerId)
             {
@@ -146,6 +182,11 @@ namespace Game.Client.Runtime
             roundResultPanel.SetActive(false);
 
             if (gameOverText && string.IsNullOrEmpty(gameOverText.text)) gameOverText.text = "Game Over!";
+        }
+
+        private static void RestartGameScene()
+        {
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
 
         #region Helper methods
