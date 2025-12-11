@@ -25,6 +25,7 @@ namespace Game.Client.Runtime
             if (drawButton)
             {
                 drawButton.onClick.AddListener(OnDrawButtonClicked);
+                drawButton.gameObject.SetActive(false);
             }
         }
 
@@ -54,6 +55,8 @@ namespace Game.Client.Runtime
         {
             lock (_lockObject)
             {
+                drawButton.gameObject.SetActive(false);
+                
                 if (_completionSource == null || _completionSource.Task.IsCompleted) return;
                 
                 _completionSource.TrySetResult(true);
@@ -87,6 +90,8 @@ namespace Game.Client.Runtime
                 {
                     _cancellationRegistration = cancellationToken.Register(CheckAndCancelCompletionSource);
                 }
+                
+                drawButton.gameObject.SetActive(true);
             }
 
             return _completionSource.Task;
