@@ -3,7 +3,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Game.Core.Abstractions;
 using Game.Core.Model;
-using UnityEngine;
 
 namespace Game.Core.Application
 {
@@ -15,10 +14,11 @@ namespace Game.Core.Application
         private readonly IGameView _gameView;
         private readonly IGameMode _gameMode;
         private readonly GameState _gameState;
+        private readonly ILogger _logger;
 
         private readonly int _playerCount;
         
-        public GameController(IDeckProviderService deckProviderService, IPlayer[] players, IPlayerController[] playerControllers, IGameView gameView, IGameMode gameMode, GameState gameState)
+        public GameController(IDeckProviderService deckProviderService, IPlayer[] players, IPlayerController[] playerControllers, IGameView gameView, IGameMode gameMode, GameState gameState, ILogger logger)
         {
             if (players.Length != playerControllers.Length)
                 throw new System.ArgumentException("Number of players and player controllers must be equal");
@@ -30,13 +30,14 @@ namespace Game.Core.Application
             _gameMode = gameMode;
             _gameState = gameState;
             _playerCount = players.Length;
+            _logger = logger;
         }
         
         public async Task StartGameAsync(CancellationToken cancellationToken = default)
         {
             if (_gameState.Phase == GamePhase.Finished)
             {
-                Debug.LogWarning("[GameController] Game already finished");
+                _logger.LogWarning("[GameController] Game already finished");
                 return;
             }
             
@@ -50,13 +51,13 @@ namespace Game.Core.Application
         {
             if (_gameState.Phase != GamePhase.Playing)
             {
-                Debug.LogWarning("[GameController] Game not started yet");
+                _logger.LogWarning("[GameController] Game not started yet");
                 return;
             }
 
             if (_gameState.Phase == GamePhase.Finished)
             {
-                Debug.LogWarning("[GameController] Game already finished");
+                _logger.LogWarning("[GameController] Game already finished");
                 return;
             }
             
@@ -76,7 +77,7 @@ namespace Game.Core.Application
             if (drawnCards == null)
             {
                 // TODO: Handle error
-                Debug.LogError("[GameController] Failed to draw cards");
+                _logger.LogError("[GameController] Failed to draw cards");
                 return;
             }
             
@@ -104,7 +105,7 @@ namespace Game.Core.Application
         {
             if (_gameState.Phase == GamePhase.Finished)
             {
-                Debug.LogWarning("[GameController] Game already finished");
+                _logger.LogWarning("[GameController] Game already finished");
                 return;
             }
             
