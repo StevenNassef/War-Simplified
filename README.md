@@ -20,8 +20,11 @@ A Unity-based card game implementation of a simplified version of the classic "W
 - **Local vs Bot**: Play against an AI opponent
 - **Real-time Card Drawing**: Uses the Deck of Cards API for authentic card deck management
 - **Score Tracking**: Track scores across multiple rounds
-- **Clean Architecture**: Separated Core and Client layers for maintainability
-- **Unit Tests**: Comprehensive test coverage for game logic
+- **Clean Architecture**: Strict separation of concerns with Unity-agnostic Core module
+  - Core module contains zero Unity dependencies (enforced by assembly definitions)
+  - Business logic is completely portable and testable without Unity
+- **Assembly Definition Enforcement**: Compile-time architectural boundaries prevent coupling
+- **Unit Tests**: Comprehensive test coverage for game logic (Core tests run without Unity)
 - **Modern Unity UI**: Built with TextMeshPro and Unity UI system
 
 ## Requirements
@@ -96,35 +99,124 @@ Assets/
 │       │   ├── DTOs/            # API response data transfer objects
 │       │   ├── Infrastructure/  # API client implementation
 │       │   ├── Runtime/         # Unity MonoBehaviour components
-│       │   └── Tests/           # Client layer tests
-│       └── Core/                # Platform-agnostic game logic
+│       │   ├── Tests/           # Client layer tests
+│       │   └── Game.Client.asmdef  # Assembly definition (allows Unity refs)
+│       └── Core/                # Platform-agnostic game logic (NO Unity refs)
 │           ├── Abstractions/   # Interfaces and contracts
 │           ├── Application/    # Game controllers and services
 │           ├── Model/         # Domain models (Card, GameState, etc.)
-│           └── Tests/         # Core logic unit tests
+│           ├── Tests/         # Core logic unit tests
+│           └── Game.Core.asmdef  # Assembly definition (noEngineReferences: true)
 ```
+
+### Assembly Definitions
+
+Each module has its own **Assembly Definition** file (`.asmdef`) that enforces architectural boundaries:
+
+- **`Game.Core.asmdef`**: 
+  - `noEngineReferences: true` - **Prevents any Unity engine code**
+  - No assembly references - Completely isolated
+  - Ensures Core remains Unity-agnostic
+
+- **`Game.Client.asmdef`**: 
+  - References `Game.Core` assembly
+  - `noEngineReferences: false` - Allows Unity APIs
+  - Contains Unity-specific implementations
+
+This structure ensures **compile-time enforcement** of separation of concerns - any attempt to reference Unity code from the Core module will result in compilation errors.
 
 ## Architecture
 
-The project follows a clean architecture pattern with clear separation of concerns:
+The project follows a **clean architecture pattern** with **strict separation of concerns**, enforced at compile-time through Unity Assembly Definitions. This architecture ensures that business logic remains completely independent from Unity-specific code.
 
-### Core Layer
+### Core Principle: Unity-Agnostic Core Module
+
+The **Core** module (`Game.Core`) is designed to be **completely independent** of Unity and contains **zero Unity engine references**. This is enforced through assembly definition settings that prevent any Unity API usage.
+
+#### Core Layer (Unity-Agnostic)
+
+The Core layer contains pure C# business logic with **no Unity dependencies**:
+
 - **Abstractions**: Defines interfaces for game controllers, views, players, and services
+  - `IGameController`, `IGameView`, `IPlayer`, `IPlayerController`, `IGameMode`
+  - `IDeckProviderService`, `ICardApiClient`, `ILogger`
 - **Application**: Contains game logic, controllers, and game modes
+  - `GameController`: Orchestrates game flow and round management
+  - `SimpleWasGameMode`: Implements the simplified War game rules
+  - `DeckProviderService`: Manages deck operations via API
 - **Model**: Domain models including `Card`, `GameState`, `PlayerState`
+  - Pure data structures with no Unity dependencies
 
-### Client Layer
-- **Infrastructure**: Unity-specific implementations (API client, logging)
-- **Runtime**: Unity MonoBehaviour components (GameView, GameBootstrap, controllers)
+**Key Benefits:**
+- ✅ **Testable**: Can be unit tested without Unity Test Runner
+- ✅ **Portable**: Can be reused in non-Unity projects
+- ✅ **Maintainable**: Clear boundaries prevent coupling to Unity APIs
+- ✅ **Compile-time Safety**: Assembly definitions prevent accidental Unity references
+
+#### Client Layer (Unity-Specific)
+
+The Client layer contains Unity-specific implementations that depend on the Core:
+
+- **Infrastructure**: Unity-specific implementations
+  - `DeckOfCardsApiClient`: Unity WebRequest-based API client
+  - `UnityLogger`: Unity Debug.Log wrapper
+- **Runtime**: Unity MonoBehaviour components
+  - `GameView`: Unity UI implementation for displaying game state
+  - `GameBootstrap`: Unity MonoBehaviour that initializes the game
+  - `LocalPlayerController`, `BotPlayerController`: Unity-based player controllers
 - **DTOs**: Data transfer objects for API communication
+
+### Assembly Definitions: Enforcing Separation
+
+The project uses **Unity Assembly Definitions** to enforce architectural boundaries at compile-time:
+
+#### Core Assembly (`Game.Core.asmdef`)
+
+```json
+{
+    "name": "Game.Core",
+    "references": [],
+    "noEngineReferences": true  // ← Enforces no Unity engine code!
+}
+```
+
+**Critical Settings:**
+- `"noEngineReferences": true` - **Prevents any Unity engine API usage**
+- `"references": []` - No dependencies on other assemblies
+- **Compile-time enforcement**: Any attempt to use Unity APIs (e.g., `UnityEngine.Debug`, `MonoBehaviour`) will result in compilation errors
+
+#### Client Assembly (`Game.Client.asmdef`)
+
+```json
+{
+    "name": "Game.Client",
+    "references": [
+        "Game.Core"  // ← Can reference Core, but Core cannot reference Client
+    ],
+    "noEngineReferences": false  // ← Allows Unity engine code
+}
+```
+
+**Dependency Flow:**
+- ✅ Client → Core (allowed)
+- ❌ Core → Client (blocked by assembly definitions)
+- ❌ Core → Unity Engine (blocked by `noEngineReferences: true`)
+
+### Separation of Concerns Benefits
+
+1. **Testability**: Core logic can be tested with standard .NET testing frameworks without Unity overhead
+2. **Reusability**: Core module can be extracted and used in console apps, web APIs, or other game engines
+3. **Maintainability**: Changes to Unity-specific code don't affect business logic
+4. **Team Collaboration**: Different developers can work on Core and Client layers independently
+5. **Compile-time Safety**: Assembly definitions catch architectural violations before runtime
 
 ### Key Components
 
-- **`GameController`**: Orchestrates game flow and round management
-- **`GameView`**: Unity UI implementation for displaying game state
-- **`DeckProviderService`**: Manages deck operations via API
-- **`SimpleWasGameMode`**: Implements the simplified War game rules
-- **`DeckOfCardsApiClient`**: Unity WebRequest-based API client
+- **`GameController`** (Core): Orchestrates game flow and round management - **Unity-agnostic**
+- **`GameView`** (Client): Unity UI implementation that implements `IGameView` from Core
+- **`DeckProviderService`** (Core): Manages deck operations via API abstraction
+- **`SimpleWasGameMode`** (Core): Implements game rules - **pure C# logic**
+- **`DeckOfCardsApiClient`** (Client): Unity WebRequest-based implementation of `ICardApiClient`
 
 ## API Integration
 
@@ -142,7 +234,7 @@ The game integrates with the [Deck of Cards API](https://deckofcardsapi.com/) fo
 
 ## Testing
 
-The project includes comprehensive unit tests using Unity Test Framework and NSubstitute for mocking.
+The project includes comprehensive unit tests using Unity Test Framework and NSubstitute for mocking. The architecture's separation of concerns enables different testing strategies for each layer.
 
 ### Running Tests
 
@@ -152,15 +244,41 @@ The project includes comprehensive unit tests using Unity Test Framework and NSu
 
 ### Test Structure
 
-- **Core Tests**: Unit tests for game logic, models, and controllers
-- **Client Tests**: Integration tests for API client and Unity components
+#### Core Tests (Unity-Agnostic)
 
-### Key Test Files
+The **Core tests** (`Game.Core.Tests`) test pure business logic that has **zero Unity dependencies**:
 
+- ✅ Can run with standard .NET testing frameworks (NUnit, xUnit, MSTest)
+- ✅ Fast execution - no Unity overhead
+- ✅ Can be run in CI/CD pipelines without Unity
+- ✅ Tests game logic, models, controllers, and game modes
+
+**Key Test Files:**
 - `SimpleWasGameModeTests.cs` - Game mode logic tests
 - `GameControllerTests.cs` - Game controller flow tests
 - `CardTests.cs` - Card model validation tests
-- `DeckOfCardsApiClientTests.cs` - API client tests
+- `DeckProviderServiceTests.cs` - Service logic tests
+
+#### Client Tests (Unity-Specific)
+
+The **Client tests** (`Game.Client.Tests`) test Unity-specific implementations:
+
+- Requires Unity Test Framework
+- Tests Unity components, API clients, and MonoBehaviour behavior
+- Integration tests for Unity-specific functionality
+
+**Key Test Files:**
+- `DeckOfCardsApiClientTests.cs` - Unity WebRequest API client tests
+- `DeckProviderServiceIntegrationTests.cs` - Integration tests
+
+### Testing Benefits of Architecture
+
+The strict separation enforced by assembly definitions provides significant testing advantages:
+
+1. **Fast Core Tests**: Core logic tests run without Unity initialization overhead
+2. **Isolated Testing**: Core tests don't require Unity Test Runner - can use any .NET test framework
+3. **Mock-Friendly**: Core interfaces make it easy to mock dependencies
+4. **CI/CD Friendly**: Core tests can run in standard .NET CI/CD pipelines
 
 ## Development
 
