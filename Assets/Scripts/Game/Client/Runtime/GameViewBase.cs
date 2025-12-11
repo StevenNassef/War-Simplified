@@ -24,14 +24,14 @@ namespace Game.Client.Runtime
         protected abstract Task EndGameInternal();
         
         protected IPlayer[] Players;
-        private readonly Queue<Func<Task>> _taskQueue = new();
+        private readonly Queue<(string TaskName, Func<Task> TaskFactory)> _taskQueue = new();
         private bool _isProcessingQueue;
 
-        private void EnqueueTask(Func<Task> taskFactory)
+        private void EnqueueTask(string taskName, Func<Task> taskFactory)
         {
             lock (_taskQueue)
             {
-                _taskQueue.Enqueue(taskFactory);
+                _taskQueue.Enqueue((taskName, taskFactory));
 
                 if (_isProcessingQueue) return;
                 _isProcessingQueue = true;
@@ -45,7 +45,7 @@ namespace Game.Client.Runtime
             {
                 while (true)
                 {
-                    Func<Task> taskFactory;
+                    (string TaskName, Func<Task> taskFactory) tuple;
 
                     lock (_taskQueue)
                     {
@@ -55,12 +55,14 @@ namespace Game.Client.Runtime
                             return;
                         }
 
-                        taskFactory = _taskQueue.Dequeue();
+                        tuple = _taskQueue.Dequeue();
                     }
 
                     try
                     {
-                        await taskFactory();
+                        Debug.Log($"[GameView] Task Started: {tuple.TaskName}");
+                        await tuple.taskFactory();
+                        Debug.Log($"[GameView] Task Ended: {tuple.TaskName}");
                     }
                     catch (Exception ex)
                     {
@@ -76,14 +78,14 @@ namespace Game.Client.Runtime
         #region IGameView implementation
         public void StartGame()
         {
-            EnqueueTask(StartGameInternal);
+            EnqueueTask(nameof(StartGame), StartGameInternal);
         }
 
         public void UpdateScores(IReadOnlyList<int> scores)
         {
             // Create a copy of the scores list to avoid issues with the list being modified
             var scoresCopy = new List<int>(scores);
-            EnqueueTask(() => UpdateScoresInternal(scoresCopy));
+            EnqueueTask(nameof(UpdateScores), () => UpdateScoresInternal(scoresCopy));
         }
 
         public void ShowRoundResult(int roundIndex, IReadOnlyList<Card> cards, IReadOnlyList<int> scores,
@@ -92,17 +94,17 @@ namespace Game.Client.Runtime
             // Create copies to avoid issues with collections being modified
             var cardsCopy = new List<Card>(cards);
             var scoresCopy = new List<int>(scores);
-            EnqueueTask(() => ShowRoundResultInternal(roundIndex, cardsCopy, scoresCopy, roundWinnerId));
+            EnqueueTask(nameof(ShowRoundResult) ,() => ShowRoundResultInternal(roundIndex, cardsCopy, scoresCopy, roundWinnerId));
         }
 
         public void ShowGameOver(int winnerId)
         {
-            EnqueueTask(() => ShowGameOverInternal(winnerId));
+            EnqueueTask(nameof(ShowGameOver), () => ShowGameOverInternal(winnerId));
         }
 
         public void EndGame()
         {
-            EnqueueTask(EndGameInternal);
+            EnqueueTask(nameof(EndGame), EndGameInternal);
         }
         
         #endregion
