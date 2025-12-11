@@ -20,12 +20,14 @@ namespace Game.Core.Tests.Application
         private IGameMode _gameMode;
         private IPlayer[] _players;
         private IPlayerController[] _playerControllers;
+        private ILogger _logger;
 
         [SetUp]
         public void SetUp()
         {
             _deckProvider = Substitute.For<IDeckProviderService>();
             _gameView = Substitute.For<IGameView>();
+            _logger = Substitute.For<ILogger>();
             _gameState = new GameState();
             _gameMode = new SimpleWasGameMode(initialMaxRounds: 8, pointsPerRound: 1);
             
@@ -55,7 +57,7 @@ namespace Game.Core.Tests.Application
             // Act & Assert
             Assert.Throws<ArgumentException>(() =>
             {
-                _ = new GameController(_deckProvider, _players, mismatchedControllers, _gameView, _gameMode, _gameState);
+                _ = new GameController(_deckProvider, _players, mismatchedControllers, _gameView, _gameMode, _gameState, _logger);
             });
         }
 
@@ -63,7 +65,7 @@ namespace Game.Core.Tests.Application
         public void Constructor_WithMatchingCounts_CreatesInstance()
         {
             // Act
-            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState);
+            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState, _logger);
 
             // Assert
             Assert.IsNotNull(controller);
@@ -74,7 +76,7 @@ namespace Game.Core.Tests.Application
         {
             // Arrange
             _deckProvider.InitializeAsync(Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
-            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState);
+            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState, _logger);
 
             // Act
             await controller.StartGameAsync();
@@ -91,7 +93,7 @@ namespace Game.Core.Tests.Application
         {
             // Arrange
             _deckProvider.InitializeAsync(Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
-            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState);
+            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState, _logger);
             _gameState.Phase = GamePhase.Finished;
             _gameView.ClearReceivedCalls();
 
@@ -106,7 +108,7 @@ namespace Game.Core.Tests.Application
         public async Task PlayRoundAsync_WhenGameNotStarted_DoesNotPlay()
         {
             // Arrange
-            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState);
+            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState, _logger);
             _gameState.Phase = GamePhase.NotStarted;
 
             // Act
@@ -120,7 +122,7 @@ namespace Game.Core.Tests.Application
         public async Task PlayRoundAsync_WhenGameFinished_DoesNotPlay()
         {
             // Arrange
-            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState);
+            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState, _logger);
             _gameState.Phase = GamePhase.Finished;
 
             // Act
@@ -148,7 +150,7 @@ namespace Game.Core.Tests.Application
                 playerController.RequestDrawAsync(Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
             }
             
-            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState);
+            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState, _logger);
             _gameMode.ConfigureNewGame(_gameState, _players);
             
 
@@ -181,7 +183,7 @@ namespace Game.Core.Tests.Application
                 playerController.RequestDrawAsync(Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
             }
             
-            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState);
+            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState, _logger);
             _gameMode.ConfigureNewGame(_gameState, _players);
             
 
@@ -214,7 +216,7 @@ namespace Game.Core.Tests.Application
                 playerController.RequestDrawAsync(Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
             }
             
-            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState);
+            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState, _logger);
             _gameMode.ConfigureNewGame(_gameState, _players);
 
 
@@ -241,7 +243,7 @@ namespace Game.Core.Tests.Application
                 playerController.RequestDrawAsync(Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
             }
             
-            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState);
+            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState, _logger);
             _gameMode.ConfigureNewGame(_gameState, _players);
             
 
@@ -268,7 +270,7 @@ namespace Game.Core.Tests.Application
                     .Returns(Task.FromException(new TaskCanceledException()));
             }
             
-            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState);
+            var controller = new GameController(_deckProvider, _players, _playerControllers, _gameView, _gameMode, _gameState, _logger);
             _gameMode.ConfigureNewGame(_gameState, _players);
             
 
