@@ -15,8 +15,7 @@ namespace Game.Client.Runtime
     {
         [Header("Game Player")] [SerializeField]
         private GameView gameView;
-
-        [SerializeField] private LocalPlayerController playerController;
+        
         [SerializeField] private LocalPlayer[] players;
         [SerializeField] private LocalPlayerController mainPlayerController;
 
@@ -34,7 +33,7 @@ namespace Game.Client.Runtime
         {
             _logger = new UnityLogger();
             _apiClient = new DeckOfCardsApiClient();
-            _botPlayerController = new BotPlayerController();
+            _botPlayerController = new BotPlayerController(3f);
             _gameMode = new SimpleWasGameMode();
         }
 
@@ -44,10 +43,12 @@ namespace Game.Client.Runtime
             _gameState = new GameState();
 
             var playersList = new IPlayer[players.Length];
-            playersList.CopyTo(players, 0);
+            players.CopyTo(playersList, 0);
 
+            gameView.Initialize(playersList);
             _gameController = new GameController(new DeckProviderService(_apiClient), playersList,
                 new[] { mainPlayerController, _botPlayerController }, gameView, _gameMode, _gameState, _logger);
+            PlayGame().GetAwaiter();
         }
 
         public async Task PlayGame()

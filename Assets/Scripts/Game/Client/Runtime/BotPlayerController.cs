@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Game.Core.Abstractions;
@@ -10,27 +11,48 @@ namespace Game.Client.Runtime
     /// </summary>
     public class BotPlayerController : IPlayerController
     {
-        private const float MinDelaySeconds = 1f;
-        private const float MaxDelaySeconds = 3f;
+        private readonly float _minDelaySeconds = 1f;
+        private readonly float _maxDelaySeconds = 3f;
         
-        private readonly System.Random _random;
+        private readonly bool _constantDelay = false;
+        
+        private readonly Random _random;
 
         public BotPlayerController()
         {
-            _random = new System.Random();
+            _random = new Random();
         }
 
         public BotPlayerController(int seed)
         {
-            _random = new System.Random(seed);
+            _random = new Random(seed);
         }
 
+        public BotPlayerController(float minDelaySeconds, float maxDelaySeconds)
+        {
+            _minDelaySeconds = minDelaySeconds;
+            _maxDelaySeconds = maxDelaySeconds;
+            _random = new Random();
+        }
+
+        public BotPlayerController(float constantDelaySeconds)
+        {
+            _constantDelay = true;
+            _minDelaySeconds = constantDelaySeconds;
+            _maxDelaySeconds = constantDelaySeconds;
+        }
+        
         public async Task RequestDrawAsync(CancellationToken cancellationToken = default)
         {
             // Generate a random delay between MinDelaySeconds and MaxDelaySeconds
-            var delaySeconds = (float)(_random.NextDouble() * (MaxDelaySeconds - MinDelaySeconds) + MinDelaySeconds);
+            var delaySeconds = _minDelaySeconds;
+            
+            if (!_constantDelay)
+            {
+                delaySeconds = (float)(_random.NextDouble() * (_maxDelaySeconds - _minDelaySeconds) + _minDelaySeconds);    
+            }
+            
             var delayMilliseconds = (int)(delaySeconds * 1000);
-
             try
             {
                 await Task.Delay(delayMilliseconds, cancellationToken);
