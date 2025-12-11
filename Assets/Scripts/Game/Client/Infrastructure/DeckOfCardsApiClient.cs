@@ -33,7 +33,7 @@ namespace Game.Client.Infrastructure
         public async Task<(string deckId, int remaining)> ReshuffleDeckAsync(string deckId,
             CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrEmpty(deckId))
+            if (string.IsNullOrEmpty(deckId) || string.IsNullOrWhiteSpace(deckId))
                 throw new ArgumentException("Deck ID cannot be null or empty", nameof(deckId));
 
             var url = $"{BaseUrl}/{deckId}/shuffle/";
@@ -47,7 +47,7 @@ namespace Game.Client.Infrastructure
         public async Task<(Card[] drawnCards, int remaining)> DrawCardsAsync(string deckId, int count,
             CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrEmpty(deckId))
+            if (string.IsNullOrEmpty(deckId) || string.IsNullOrWhiteSpace(deckId))
                 throw new ArgumentException("Deck ID cannot be null or empty", nameof(deckId));
             if (count <= 0)
                 throw new ArgumentOutOfRangeException(nameof(count), count, "Count must be greater than 0");
@@ -101,22 +101,43 @@ namespace Game.Client.Infrastructure
             };
         }
 
-        private static async Task<T> SendRequestAsync<T>(string url, CancellationToken cancellationToken)
+        private async Task<T> SendRequestAsync<T>(string url, CancellationToken cancellationToken)
         {
             using var request = UnityWebRequest.Get(url);
             var operation = request.SendWebRequest();
+            
+            await AwaitUnityWebRequestAsync(operation, cancellationToken);
 
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                throw new Exception($"HTTP request failed: {request.error} (URL: {url})");
+            }
+            
+            var json = request.downloadHandler.text;
+            if (string.IsNullOrEmpty(json))
+            {
+                throw new Exception($"Empty response received from API (URL: {url})");
+            }
+
+            try
+            {
+                return JsonUtility.FromJson<T>(json);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to parse JSON response: {ex.Message} (URL: {url})", ex);
+            }
+        }
+
+        private async Task AwaitUnityWebRequestAsync(
+            UnityWebRequestAsyncOperation operation, 
+            CancellationToken cancellationToken)
+        {
             while (!operation.isDone)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 await Task.Yield();
             }
-
-            if (request.result != UnityWebRequest.Result.Success)
-                throw new Exception($"HTTP request failed: {request.error} (URL: {url})");
-
-            var json = request.downloadHandler.text;
-            return JsonUtility.FromJson<T>(json);
         }
     }
 }
