@@ -1,0 +1,16 @@
+{
+    "name": "Game.Client",
+    "rootNamespace": "",
+    "references": [
+        "GUID:47c1a074e23d4416c8177e35ae44b89a"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
