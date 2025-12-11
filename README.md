@@ -184,6 +184,264 @@ The project includes comprehensive unit tests using Unity Test Framework and NSu
 - **Unity Test Framework**: For unit testing
 - **NSubstitute**: For test mocking
 
+## Future Improvements
+
+If given more time, the following improvements would enhance the project's architecture and performance:
+
+### UniTask Integration
+
+Currently, the project uses standard `Task` and `Task.Yield()` for async operations. Integrating [UniTask](https://github.com/Cysharp/UniTask) would provide better performance and Unity-specific async/await support.
+
+#### Benefits
+- Zero-allocation async operations
+- Better integration with Unity's lifecycle
+- Cancellation token support optimized for Unity
+- Improved performance in hot paths
+
+#### Implementation Example
+
+**Before (Current Implementation):**
+```csharp
+protected override async Task StartGameInternal()
+{
+    await Task.Yield();
+    gamePanel.SetActive(true);
+    mainMenuPanel.SetActive(false);
+}
+```
+
+**After (With UniTask):**
+```csharp
+using Cysharp.Threading.Tasks;
+
+protected override async UniTask StartGameInternal()
+{
+    await UniTask.Yield();
+    gamePanel.SetActive(true);
+    mainMenuPanel.SetActive(false);
+}
+```
+
+**API Client with UniTask:**
+```csharp
+using Cysharp.Threading.Tasks;
+using UnityEngine.Networking;
+
+public async UniTask<(string deckId, int remaining)> CreateAndShuffleNewDeckAsync(
+    CancellationToken cancellationToken = default)
+{
+    var url = $"{BaseUrl}/new/shuffle/?deck_count=1";
+    using var request = UnityWebRequest.Get(url);
+    
+    await request.SendWebRequest().ToUniTask(cancellationToken: cancellationToken);
+    
+    if (request.result != UnityWebRequest.Result.Success)
+    {
+        throw new Exception($"HTTP request failed: {request.error}");
+    }
+    
+    var response = JsonUtility.FromJson<DeckResponse>(request.downloadHandler.text);
+    return (response.deck_id, response.remaining);
+}
+```
+
+### Dependency Injection
+
+Currently, dependencies are manually constructed in `GameBootstrap`. Implementing a DI container (such as [Zenject](https://github.com/modesttree/Zenject) or [VContainer](https://github.com/hadashiA/VContainer)) would improve testability and maintainability.
+
+#### Benefits
+- Loose coupling between components
+- Easier unit testing with mock injection
+- Centralized dependency management
+- Better support for lifecycle management
+
+#### Implementation Example with VContainer
+
+**1. Install VContainer via Package Manager:**
+```
+https://github.com/hadashiA/VContainer.git?path=VContainer/Assets/VContainer
+```
+
+**2. Create Lifetime Scopes:**
+
+```csharp
+using VContainer;
+using VContainer.Unity;
+
+public class GameLifetimeScope : LifetimeScope
+{
+    protected override void Configure(IContainerBuilder builder)
+    {
+        // Register services
+        builder.Register<ICardApiClient, DeckOfCardsApiClient>(Lifetime.Singleton);
+        builder.Register<IDeckProviderService, DeckProviderService>(Lifetime.Singleton);
+        builder.Register<ILogger, UnityLogger>(Lifetime.Singleton);
+        
+        // Register game mode
+        builder.Register<IGameMode>(container => 
+            new SimpleWasGameMode(initialMaxRounds: 8, pointsPerRound: 1), 
+            Lifetime.Singleton);
+        
+        // Register controllers
+        builder.Register<IPlayerController>(container => 
+            new BotPlayerController(3f), 
+            Lifetime.Transient)
+            .AsImplementedInterfaces();
+        
+        // Register game controller
+        builder.Register<IGameController, GameController>(Lifetime.Transient);
+        
+        // Register Unity components
+        builder.RegisterComponentInHierarchy<GameView>();
+        builder.RegisterComponentInHierarchy<GameBootstrap>();
+    }
+}
+```
+
+**3. Update GameBootstrap to use DI:**
+
+```csharp
+using VContainer;
+using VContainer.Unity;
+
+public class GameBootstrap : MonoBehaviour, IStartable
+{
+    [SerializeField] private LocalPlayer[] players;
+    [SerializeField] private LocalPlayerController mainPlayerController;
+    
+    private IGameController _gameController;
+    private GameView _gameView;
+    private IGameMode _gameMode;
+    private GameState _gameState;
+    private CancellationTokenSource _cancellationTokenSource;
+    
+    [Inject]
+    public void Construct(
+        IGameController gameController,
+        GameView gameView,
+        IGameMode gameMode)
+    {
+        _gameController = gameController;
+        _gameView = gameView;
+        _gameMode = gameMode;
+    }
+    
+    public void Start()
+    {
+        InitializeGame();
+    }
+    
+    public void InitializeGame()
+    {
+        _cancellationTokenSource = new CancellationTokenSource();
+        _gameState = new GameState();
+        
+        var playersList = new IPlayer[players.Length];
+        players.CopyTo(playersList, 0);
+        
+        _gameView.Initialize(playersList);
+        PlayGame().Forget();
+    }
+    
+    private async UniTaskVoid PlayGame()
+    {
+        await _gameController.StartGameAsync(_cancellationTokenSource.Token);
+        while (_gameState.Phase != GamePhase.Finished)
+        {
+            await _gameController.PlayRoundAsync(_cancellationTokenSource.Token);
+        }
+    }
+}
+```
+
+**4. Update GameController Constructor:**
+
+```csharp
+public class GameController : IGameController
+{
+    private readonly IDeckProviderService _deckProviderService;
+    private readonly IPlayer[] _players;
+    private readonly IPlayerController[] _playerControllers;
+    private readonly IGameView _gameView;
+    private readonly IGameMode _gameMode;
+    private readonly GameState _gameState;
+    private readonly ILogger _logger;
+    
+    [Inject]
+    public GameController(
+        IDeckProviderService deckProviderService,
+        IPlayer[] players,
+        IPlayerController[] playerControllers,
+        IGameView gameView,
+        IGameMode gameMode,
+        GameState gameState,
+        ILogger logger)
+    {
+        // Constructor injection handled by DI container
+        _deckProviderService = deckProviderService;
+        _players = players;
+        _playerControllers = playerControllers;
+        _gameView = gameView;
+        _gameMode = gameMode;
+        _gameState = gameState;
+        _logger = logger;
+    }
+}
+```
+
+**5. Benefits in Testing:**
+
+```csharp
+[Test]
+public void GameController_StartGame_InitializesDeck()
+{
+    // Arrange
+    var mockDeckService = Substitute.For<IDeckProviderService>();
+    var mockView = Substitute.For<IGameView>();
+    var mockMode = Substitute.For<IGameMode>();
+    var mockLogger = Substitute.For<ILogger>();
+    
+    var players = new[] { Substitute.For<IPlayer>() };
+    var controllers = new[] { Substitute.For<IPlayerController>() };
+    var gameState = new GameState();
+    
+    // Easy to inject mocks with DI
+    var controller = new GameController(
+        mockDeckService,
+        players,
+        controllers,
+        mockView,
+        mockMode,
+        gameState,
+        mockLogger);
+    
+    // Act & Assert
+    // Test implementation...
+}
+```
+
+#### Alternative: Manual DI Container
+
+If preferring a lightweight solution without external packages:
+
+```csharp
+public class ServiceContainer
+{
+    private readonly Dictionary<Type, object> _services = new();
+    
+    public void Register<T>(T instance) where T : class
+    {
+        _services[typeof(T)] = instance;
+    }
+    
+    public T Resolve<T>() where T : class
+    {
+        return _services.TryGetValue(typeof(T), out var service) 
+            ? service as T 
+            : throw new InvalidOperationException($"Service {typeof(T)} not registered");
+    }
+}
+```
 
 ## Acknowledgments
 
