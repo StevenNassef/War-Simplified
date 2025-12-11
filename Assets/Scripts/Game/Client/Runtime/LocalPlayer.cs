@@ -1,7 +1,9 @@
+using System;
 using Game.Core.Abstractions;
 
 namespace Game.Client.Runtime
 {
+    [Serializable]
     public class LocalPlayer : IPlayer
     {
         public string Id { get; }
