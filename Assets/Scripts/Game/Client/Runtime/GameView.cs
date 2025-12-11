@@ -10,7 +10,7 @@ namespace Game.Client.Runtime
     /// <summary>
     /// Unity implementation of IGameView for displaying game state and results.
     /// </summary>
-    public class GameView : MonoBehaviour, IGameView
+    public class GameView : GameViewBase
     {
         [Header("Player Score Displays")] [SerializeField] [Tooltip("PlayerScoreDisplay components (one per player)")]
         private PlayerScoreDisplay[] playerScoreDisplays;
@@ -32,14 +32,11 @@ namespace Game.Client.Runtime
 
         [SerializeField] [Tooltip("for displaying game over message")]
         private TextMeshProUGUI gameOverText;
+        
 
-        private IPlayer[] _players;
-        private readonly Queue<System.Func<Task>> _taskQueue = new();
-        private bool _isProcessingQueue;
-
-        public void Initialize(IPlayer[] players)
+        public override void Initialize(IPlayer[] players)
         {
-            _players = players;
+            Players = players;
 
             // Validate that we have enough UI elements for the number of players
             if (playerScoreDisplays != null && playerScoreDisplays.Length < players.Length)
@@ -51,17 +48,17 @@ namespace Game.Client.Runtime
                     $"[GameView] Not enough card texts ({cardTexts.Length}) for players ({players.Length})");
 
             // Initialize player score displays
-            if (playerScoreDisplays == null || _players == null)
+            if (playerScoreDisplays == null || Players == null)
             {
                 Debug.LogWarning("[GameView] Player score displays not initialized");
                 return;
             }
 
-            for (var i = 0; i < playerScoreDisplays.Length && i < _players.Length; i++)
-                playerScoreDisplays[i].Initialize(_players[i]);
+            for (var i = 0; i < playerScoreDisplays.Length && i < Players.Length; i++)
+                playerScoreDisplays[i].Initialize(Players[i]);
         }
 
-        protected virtual async Task StartGameInternal()
+        protected override async Task StartGameInternal()
         {
             await Task.Yield();
 
@@ -70,7 +67,7 @@ namespace Game.Client.Runtime
             gameOverPanel.SetActive(false);
         }
 
-        private async Task UpdateScoresInternal(IReadOnlyList<int> scores)
+        protected override async Task UpdateScoresInternal(IReadOnlyList<int> scores)
         {
             await Task.Yield();
 
@@ -78,7 +75,7 @@ namespace Game.Client.Runtime
                 playerScoreDisplays[i].SetScore(scores[i]);
         }
 
-        protected virtual async Task ShowRoundResultInternal(int roundIndex, IReadOnlyList<Card> cards,
+        protected override async Task ShowRoundResultInternal(int roundIndex, IReadOnlyList<Card> cards,
             IReadOnlyList<int> scores,
             int roundWinnerId)
         {
@@ -101,8 +98,8 @@ namespace Game.Client.Runtime
             if (roundWinnerId >= 0 && roundWinnerId < cards.Count)
             {
                 var winnerCard = cards[roundWinnerId];
-                var winnerName = _players != null && roundWinnerId < _players.Length
-                    ? _players[roundWinnerId].DisplayName
+                var winnerName = Players != null && roundWinnerId < Players.Length
+                    ? Players[roundWinnerId].DisplayName
                     : $"Player {roundWinnerId + 1}";
                 roundWinnerText.text = $"{winnerName} wins with {FormatCard(winnerCard)}!";
             }
@@ -115,7 +112,7 @@ namespace Game.Client.Runtime
             await UpdateScoresInternal(scores);
         }
 
-        protected virtual async Task ShowGameOverInternal(int winnerId)
+        protected override async Task ShowGameOverInternal(int winnerId)
         {
             await Task.Yield();
 
@@ -125,9 +122,9 @@ namespace Game.Client.Runtime
 
             switch (winnerId)
             {
-                case >= 0 when _players != null && winnerId < _players.Length:
+                case >= 0 when Players != null && winnerId < Players.Length:
                 {
-                    var winnerName = _players[winnerId].DisplayName;
+                    var winnerName = Players[winnerId].DisplayName;
                     gameOverText.text = $"Game Over!\n{winnerName} Wins!";
                     break;
                 }
@@ -140,7 +137,7 @@ namespace Game.Client.Runtime
             }
         }
 
-        protected virtual async Task EndGameInternal()
+        protected override async Task EndGameInternal()
         {
             await Task.Yield();
 
@@ -150,82 +147,6 @@ namespace Game.Client.Runtime
 
             if (gameOverText && string.IsNullOrEmpty(gameOverText.text)) gameOverText.text = "Game Over!";
         }
-
-
-        protected void EnqueueTask(System.Func<Task> taskFactory)
-        {
-            lock (_taskQueue)
-            {
-                _taskQueue.Enqueue(taskFactory);
-
-                if (_isProcessingQueue) return;
-                _isProcessingQueue = true;
-                ProcessTaskQueueAsync();
-            }
-        }
-
-        protected async void ProcessTaskQueueAsync()
-        {
-            while (true)
-            {
-                System.Func<Task> taskFactory;
-
-                lock (_taskQueue)
-                {
-                    if (_taskQueue.Count == 0)
-                    {
-                        _isProcessingQueue = false;
-                        return;
-                    }
-
-                    taskFactory = _taskQueue.Dequeue();
-                }
-
-                try
-                {
-                    await taskFactory();
-                }
-                catch (System.Exception ex)
-                {
-                    Debug.LogError($"[GameView] Error processing task: {ex}");
-                }
-            }
-        }
-
-        #region IGameView implementation
-
-        public void StartGame()
-        {
-            EnqueueTask(StartGameInternal);
-        }
-
-        public void UpdateScores(IReadOnlyList<int> scores)
-        {
-            // Create a copy of the scores list to avoid issues with the list being modified
-            var scoresCopy = new List<int>(scores);
-            EnqueueTask(() => UpdateScoresInternal(scoresCopy));
-        }
-
-        public void ShowRoundResult(int roundIndex, IReadOnlyList<Card> cards, IReadOnlyList<int> scores,
-            int roundWinnerId)
-        {
-            // Create copies to avoid issues with collections being modified
-            var cardsCopy = new List<Card>(cards);
-            var scoresCopy = new List<int>(scores);
-            EnqueueTask(() => ShowRoundResultInternal(roundIndex, cardsCopy, scoresCopy, roundWinnerId));
-        }
-
-        public void ShowGameOver(int winnerId)
-        {
-            EnqueueTask(() => ShowGameOverInternal(winnerId));
-        }
-
-        public void EndGame()
-        {
-            EnqueueTask(EndGameInternal);
-        }
-
-        #endregion
 
         #region Helper methods
 
